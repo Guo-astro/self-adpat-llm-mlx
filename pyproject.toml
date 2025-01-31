@@ -1,0 +1,15 @@
+[project]
+name = "self-adpat-llm-mlx"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+    "datasets>=3.2.0",
+    "mlx>=0.22.0",
+    "numpy>=2.2.2",
+    "psutil>=6.1.1",
+    "pynvml>=12.0.0",
+    "rich>=13.9.4",
+    "wandb>=0.19.5",
+]

@@ -1,0 +1,15 @@
+{"time":"2025-01-31T21:58:35.582989+09:00","level":"INFO","msg":"stream: starting","core version":"0.19.5","symlink path":"/Users/guo/OSS/self-adpat-llm-mlx/wandb/run-20250131_215835-g51r1cbw/logs/debug-core.log"}
+{"time":"2025-01-31T21:58:35.693219+09:00","level":"INFO","msg":"created new stream","id":"g51r1cbw"}
+{"time":"2025-01-31T21:58:35.693281+09:00","level":"INFO","msg":"stream: started","id":"g51r1cbw"}
+{"time":"2025-01-31T21:58:35.693302+09:00","level":"INFO","msg":"sender: started","stream_id":"g51r1cbw"}
+{"time":"2025-01-31T21:58:35.693307+09:00","level":"INFO","msg":"handler: started","stream_id":"g51r1cbw"}
+{"time":"2025-01-31T21:58:35.693366+09:00","level":"INFO","msg":"writer: Do: started","stream_id":"g51r1cbw"}
+{"time":"2025-01-31T21:58:36.041074+09:00","level":"INFO","msg":"Starting system monitor"}
+{"time":"2025-01-31T21:58:36.122829+09:00","level":"INFO","msg":"stream: closing","id":"g51r1cbw"}
+{"time":"2025-01-31T21:58:36.122855+09:00","level":"INFO","msg":"Stopping system monitor"}
+{"time":"2025-01-31T21:58:36.123255+09:00","level":"INFO","msg":"Stopped system monitor"}
+{"time":"2025-01-31T21:58:46.27725+09:00","level":"INFO","msg":"fileTransfer: Close: file transfer manager closed"}
+{"time":"2025-01-31T21:58:46.524842+09:00","level":"INFO","msg":"handler: closed","stream_id":"g51r1cbw"}
+{"time":"2025-01-31T21:58:46.524849+09:00","level":"INFO","msg":"writer: Close: closed","stream_id":"g51r1cbw"}
+{"time":"2025-01-31T21:58:46.524891+09:00","level":"INFO","msg":"sender: closed","stream_id":"g51r1cbw"}
+{"time":"2025-01-31T21:58:46.525216+09:00","level":"INFO","msg":"stream: closed","id":"g51r1cbw"}

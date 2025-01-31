@@ -1,0 +1,12 @@
+{
+  "os":  "macOS-14.7.1-arm64-arm-64bit",
+  "python":  "CPython 3.12.7",
+  "startedAt":  "2025-01-31T12:58:57.298524Z",
+  "program":  "/Users/guo/OSS/self-adpat-llm-mlx/main.py",
+  "codePath":  "main.py",
+  "email":  "guo.yansong.ngy@gmail.com",
+  "root":  "/Users/guo/OSS/self-adpat-llm-mlx",
+  "host":  "kakuiwamatsus-MacBook-Pro.local",
+  "executable":  "/Users/guo/OSS/self-adpat-llm-mlx/.venv/bin/python",
+  "codePathLocal":  "main.py"
+}

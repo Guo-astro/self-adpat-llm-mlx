@@ -1,0 +1,20 @@
+Traceback (most recent call last):
+  File "/Users/guo/OSS/self-adpat-llm-mlx/.venv/lib/python3.12/site-packages/wandb/sdk/wandb_config.py", line 165, in __getattr__
+    return self.__getitem__(key)
+           ^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/guo/OSS/self-adpat-llm-mlx/.venv/lib/python3.12/site-packages/wandb/sdk/wandb_config.py", line 130, in __getitem__
+    return self._items[key]
+           ~~~~~~~~~~~^^^^^
+KeyError: 'context_size'
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "/Users/guo/OSS/self-adpat-llm-mlx/main.py", line 330, in <module>
+    main(args)
+  File "/Users/guo/OSS/self-adpat-llm-mlx/main.py", line 58, in main
+    context_size = config.context_size
+                   ^^^^^^^^^^^^^^^^^^^
+  File "/Users/guo/OSS/self-adpat-llm-mlx/.venv/lib/python3.12/site-packages/wandb/sdk/wandb_config.py", line 167, in __getattr__
+    raise AttributeError(
+AttributeError: <class 'wandb.sdk.wandb_config.Config'> object has no attribute 'context_size'
