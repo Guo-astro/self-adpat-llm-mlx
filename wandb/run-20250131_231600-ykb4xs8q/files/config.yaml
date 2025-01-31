@@ -1,0 +1,68 @@
+_wandb:
+    value:
+        cli_version: 0.19.5
+        m: []
+        python_version: 3.12.7
+        t:
+            "1":
+                - 55
+            "2":
+                - 55
+            "3":
+                - 16
+                - 23
+                - 55
+            "4": 3.12.7
+            "5": 0.19.5
+            "8":
+                - 5
+            "12": 0.19.5
+            "13": darwin-arm64
+batch_size:
+    value: 2
+checkpoint:
+    value: false
+context_size:
+    value: 1024
+dataset:
+    value: ptb
+dim:
+    value: 1024
+eval_test:
+    value: false
+gpu:
+    value: false
+learning_rate:
+    value: 0.0003
+load_decomposed:
+    value: false
+lr_warmup:
+    value: 200
+num_blocks:
+    value: 12
+num_heads:
+    value: 16
+num_iters:
+    value: 100000
+seed:
+    value: 42
+steps_per_eval:
+    value: 1000
+steps_per_report:
+    value: 10
+svd_dir:
+    value: ./svd_params
+svd_during_training:
+    value: false
+svd_enable:
+    value: true
+svd_interval:
+    value: 5000
+svd_threshold:
+    value: 1e-05
+wandb_project:
+    value: transformer-training
+wandb_run_name:
+    value: null
+weight_decay:
+    value: 1e-05

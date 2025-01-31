@@ -1,0 +1,18 @@
+Model type: <class 'src.transformer_svd.TransformerLM'>
+Is model a subclass of nn.Module? yes
+Does model have a __call__ method? True
+Model's parameters:
+ - embedding
+ - pe
+ - transformer
+ - out_proj
+Traceback (most recent call last):
+  File "/Users/guo/OSS/self-adpat-llm-mlx/main.py", line 527, in <module>
+    main(args)
+  File "/Users/guo/OSS/self-adpat-llm-mlx/main.py", line 157, in main
+    nparams = count_parameters(model.parameters(), exclude_keys=['embedding', 'pe'])
+              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/guo/OSS/self-adpat-llm-mlx/main.py", line 89, in count_parameters
+    for name, param in named_params:
+        ^^^^^^^^^^^
+ValueError: too many values to unpack (expected 2)

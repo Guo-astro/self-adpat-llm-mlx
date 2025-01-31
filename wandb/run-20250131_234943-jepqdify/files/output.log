@@ -1,0 +1,13 @@
+Model type: <class 'src.transformer_svd.TransformerLM'>
+Is model a subclass of nn.Module? yes
+Does model have a __call__ method? True
+Model's parameters:
+Traceback (most recent call last):
+  File "/Users/guo/OSS/self-adpat-llm-mlx/main.py", line 563, in <module>
+    main(args)
+  File "/Users/guo/OSS/self-adpat-llm-mlx/main.py", line 136, in main
+    for name, param in flatten_named_parameters(model.named_parameters()):
+                                                ^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/guo/OSS/self-adpat-llm-mlx/.venv/lib/python3.12/site-packages/mlx/nn/layers/base.py", line 103, in __getattr__
+    super(Module, self).__getattribute__(key)
+AttributeError: 'TransformerLM' object has no attribute 'named_parameters'. Did you mean: 'compress_parameters'?

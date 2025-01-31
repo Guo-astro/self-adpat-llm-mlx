@@ -1,0 +1,23 @@
+2025-01-31 23:30:02,193 INFO    MainThread:675 [wandb_setup.py:_flush():68] Current SDK version is 0.19.5
+2025-01-31 23:30:02,194 INFO    MainThread:675 [wandb_setup.py:_flush():68] Configure stats pid to 675
+2025-01-31 23:30:02,194 INFO    MainThread:675 [wandb_setup.py:_flush():68] Loading settings from /Users/guo/.config/wandb/settings
+2025-01-31 23:30:02,194 INFO    MainThread:675 [wandb_setup.py:_flush():68] Loading settings from /Users/guo/OSS/self-adpat-llm-mlx/wandb/settings
+2025-01-31 23:30:02,194 INFO    MainThread:675 [wandb_setup.py:_flush():68] Loading settings from environment variables
+2025-01-31 23:30:02,194 INFO    MainThread:675 [wandb_init.py:setup_run_log_directory():637] Logging user logs to /Users/guo/OSS/self-adpat-llm-mlx/wandb/run-20250131_233002-1hz1az29/logs/debug.log
+2025-01-31 23:30:02,194 INFO    MainThread:675 [wandb_init.py:setup_run_log_directory():638] Logging internal logs to /Users/guo/OSS/self-adpat-llm-mlx/wandb/run-20250131_233002-1hz1az29/logs/debug-internal.log
+2025-01-31 23:30:02,194 INFO    MainThread:675 [wandb_init.py:init():756] calling init triggers
+2025-01-31 23:30:02,194 INFO    MainThread:675 [wandb_init.py:init():761] wandb.init called with sweep_config: {}
+config: {'gpu': False, 'seed': 42, 'dataset': 'ptb', 'context_size': 1024, 'num_blocks': 12, 'dim': 1024, 'num_heads': 16, 'checkpoint': False, 'batch_size': 2, 'num_iters': 100000, 'learning_rate': 0.0003, 'weight_decay': 1e-05, 'lr_warmup': 200, 'steps_per_report': 10, 'steps_per_eval': 1000, 'eval_test': False, 'wandb_project': 'transformer-training', 'wandb_run_name': None, 'svd_during_training': False, 'svd_interval': 5000, 'svd_dir': './svd_params', 'svd_threshold': 1e-05, 'load_decomposed': False, 'svd_enable': True, '_wandb': {}}
+2025-01-31 23:30:02,194 INFO    MainThread:675 [wandb_init.py:init():789] starting backend
+2025-01-31 23:30:02,431 INFO    MainThread:675 [wandb_init.py:init():793] sending inform_init request
+2025-01-31 23:30:02,452 INFO    MainThread:675 [backend.py:_multiprocessing_setup():97] multiprocessing start_methods=spawn,fork,forkserver, using: spawn
+2025-01-31 23:30:02,453 INFO    MainThread:675 [wandb_init.py:init():808] backend started and connected
+2025-01-31 23:30:02,454 INFO    MainThread:675 [wandb_init.py:init():901] updated telemetry
+2025-01-31 23:30:02,475 INFO    MainThread:675 [wandb_init.py:init():926] communicating run to backend with 90.0 second timeout
+2025-01-31 23:30:02,830 INFO    MainThread:675 [wandb_init.py:init():984] starting run threads in backend
+2025-01-31 23:30:02,884 INFO    MainThread:675 [wandb_run.py:_console_start():2385] atexit reg
+2025-01-31 23:30:02,884 INFO    MainThread:675 [wandb_run.py:_redirect():2235] redirect: wrap_raw
+2025-01-31 23:30:02,884 INFO    MainThread:675 [wandb_run.py:_redirect():2300] Wrapping output streams.
+2025-01-31 23:30:02,884 INFO    MainThread:675 [wandb_run.py:_redirect():2325] Redirects installed.
+2025-01-31 23:30:02,886 INFO    MainThread:675 [wandb_init.py:init():1026] run started, returning control to user process
+2025-01-31 23:30:03,088 WARNING MsgRouterThr:675 [router.py:message_loop():75] message_loop has been closed

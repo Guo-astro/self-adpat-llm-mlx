@@ -1,0 +1,15 @@
+{"time":"2025-01-31T23:16:27.811516+09:00","level":"INFO","msg":"stream: starting","core version":"0.19.5","symlink path":"/Users/guo/OSS/self-adpat-llm-mlx/wandb/run-20250131_231627-dvpaw5mq/logs/debug-core.log"}
+{"time":"2025-01-31T23:16:27.924807+09:00","level":"INFO","msg":"created new stream","id":"dvpaw5mq"}
+{"time":"2025-01-31T23:16:27.924859+09:00","level":"INFO","msg":"stream: started","id":"dvpaw5mq"}
+{"time":"2025-01-31T23:16:27.924888+09:00","level":"INFO","msg":"writer: Do: started","stream_id":"dvpaw5mq"}
+{"time":"2025-01-31T23:16:27.924924+09:00","level":"INFO","msg":"sender: started","stream_id":"dvpaw5mq"}
+{"time":"2025-01-31T23:16:27.924911+09:00","level":"INFO","msg":"handler: started","stream_id":"dvpaw5mq"}
+{"time":"2025-01-31T23:16:28.188882+09:00","level":"INFO","msg":"Starting system monitor"}
+{"time":"2025-01-31T23:16:30.010606+09:00","level":"INFO","msg":"stream: closing","id":"dvpaw5mq"}
+{"time":"2025-01-31T23:16:30.010627+09:00","level":"INFO","msg":"Stopping system monitor"}
+{"time":"2025-01-31T23:16:30.010994+09:00","level":"INFO","msg":"Stopped system monitor"}
+{"time":"2025-01-31T23:16:31.109121+09:00","level":"INFO","msg":"fileTransfer: Close: file transfer manager closed"}
+{"time":"2025-01-31T23:16:31.351219+09:00","level":"INFO","msg":"handler: closed","stream_id":"dvpaw5mq"}
+{"time":"2025-01-31T23:16:31.351495+09:00","level":"INFO","msg":"writer: Close: closed","stream_id":"dvpaw5mq"}
+{"time":"2025-01-31T23:16:31.352391+09:00","level":"INFO","msg":"sender: closed","stream_id":"dvpaw5mq"}
+{"time":"2025-01-31T23:16:31.352442+09:00","level":"INFO","msg":"stream: closed","id":"dvpaw5mq"}

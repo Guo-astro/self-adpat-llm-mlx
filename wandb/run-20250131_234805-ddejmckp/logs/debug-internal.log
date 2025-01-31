@@ -1,0 +1,15 @@
+{"time":"2025-01-31T23:48:05.99646+09:00","level":"INFO","msg":"stream: starting","core version":"0.19.5","symlink path":"/Users/guo/OSS/self-adpat-llm-mlx/wandb/run-20250131_234805-ddejmckp/logs/debug-core.log"}
+{"time":"2025-01-31T23:48:06.118844+09:00","level":"INFO","msg":"created new stream","id":"ddejmckp"}
+{"time":"2025-01-31T23:48:06.118893+09:00","level":"INFO","msg":"stream: started","id":"ddejmckp"}
+{"time":"2025-01-31T23:48:06.118943+09:00","level":"INFO","msg":"handler: started","stream_id":"ddejmckp"}
+{"time":"2025-01-31T23:48:06.118976+09:00","level":"INFO","msg":"sender: started","stream_id":"ddejmckp"}
+{"time":"2025-01-31T23:48:06.118953+09:00","level":"INFO","msg":"writer: Do: started","stream_id":"ddejmckp"}
+{"time":"2025-01-31T23:48:06.465131+09:00","level":"INFO","msg":"Starting system monitor"}
+{"time":"2025-01-31T23:48:06.726517+09:00","level":"INFO","msg":"stream: closing","id":"ddejmckp"}
+{"time":"2025-01-31T23:48:06.726546+09:00","level":"INFO","msg":"Stopping system monitor"}
+{"time":"2025-01-31T23:48:06.727007+09:00","level":"INFO","msg":"Stopped system monitor"}
+{"time":"2025-01-31T23:48:07.695262+09:00","level":"INFO","msg":"fileTransfer: Close: file transfer manager closed"}
+{"time":"2025-01-31T23:48:07.944914+09:00","level":"INFO","msg":"handler: closed","stream_id":"ddejmckp"}
+{"time":"2025-01-31T23:48:07.944975+09:00","level":"INFO","msg":"sender: closed","stream_id":"ddejmckp"}
+{"time":"2025-01-31T23:48:07.944952+09:00","level":"INFO","msg":"writer: Close: closed","stream_id":"ddejmckp"}
+{"time":"2025-01-31T23:48:07.945433+09:00","level":"INFO","msg":"stream: closed","id":"ddejmckp"}

@@ -1,0 +1,16 @@
+╭────────────── Model Information ───────────────╮
+│ Training a Transformer with 0.000 M Parameters │
+╰────────────────────────────────────────────────╯
+Traceback (most recent call last):
+  File "/Users/guo/OSS/self-adpat-llm-mlx/main.py", line 547, in <module>
+    main(args)
+  File "/Users/guo/OSS/self-adpat-llm-mlx/main.py", line 296, in main
+    loss = step(inputs, targets)
+           ^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/guo/OSS/self-adpat-llm-mlx/main.py", line 262, in step
+    loss = loss_fn(model, inputs, targets, reduce=True)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/guo/OSS/self-adpat-llm-mlx/main.py", line 212, in loss_fn
+    logits = model(x)  # Ensure model is callable
+             ^^^^^^^^
+TypeError: 'TransformerLM' object is not callable

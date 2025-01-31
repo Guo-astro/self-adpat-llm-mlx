@@ -327,7 +327,7 @@ if __name__ == "__main__":
     np.random.seed(args.seed)
     mx.random.seed(args.seed)
 
-    if not args.gpu:
-        mx.set_default_device(mx.cpu)
+
+    mx.set_default_device(mx.gpu)
 
     main(args)

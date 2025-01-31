@@ -1,0 +1,44 @@
+{
+  "os":  "macOS-14.7.1-arm64-arm-64bit",
+  "python":  "CPython 3.12.7",
+  "startedAt":  "2025-01-31T14:52:13.514544Z",
+  "program":  "/Users/guo/OSS/self-adpat-llm-mlx/main.py",
+  "codePath":  "main.py",
+  "git":  {
+    "remote":  "https://github.com/Guo-astro/self-adpat-llm-mlx.git",
+    "commit":  "a434aeeb621fc09e8bb55ea80f0ef5bd8353cf63"
+  },
+  "email":  "guo.yansong.ngy@gmail.com",
+  "root":  "/Users/guo/OSS/self-adpat-llm-mlx",
+  "host":  "kakuiwamatsus-MacBook-Pro.local",
+  "executable":  "/Users/guo/OSS/self-adpat-llm-mlx/.venv/bin/python",
+  "codePathLocal":  "main.py",
+  "cpu_count":  8,
+  "cpu_count_logical":  8,
+  "disk":  {
+    "/":  {
+      "total":  "494384795648",
+      "used":  "485265858560"
+    },
+    "/System/Volumes/Data":  {
+      "total":  "494384795648",
+      "used":  "485265858560"
+    }
+  },
+  "memory":  {
+    "total":  "34359738368"
+  },
+  "cpu":  {
+    "count":  8,
+    "countLogical":  8
+  },
+  "apple":  {
+    "name":  "Apple M1 Pro",
+    "ecpuCores":  2,
+    "pcpuCores":  6,
+    "gpuCores":  14,
+    "memoryGb":  32,
+    "swapTotalBytes":  "6442450944",
+    "ramTotalBytes":  "34359738368"
+  }
+}
