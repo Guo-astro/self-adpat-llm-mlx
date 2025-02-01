@@ -1,0 +1,7 @@
+{"time":"2025-02-01T05:33:50.373841+09:00","level":"INFO","msg":"stream: starting","core version":"0.19.5","symlink path":"/Users/guo/OSS/self-adpat-llm-mlx/wandb/run-20250201_053349-rgv78lnh/logs/debug-core.log"}
+{"time":"2025-02-01T05:33:50.492043+09:00","level":"INFO","msg":"created new stream","id":"rgv78lnh"}
+{"time":"2025-02-01T05:33:50.49209+09:00","level":"INFO","msg":"stream: started","id":"rgv78lnh"}
+{"time":"2025-02-01T05:33:50.492114+09:00","level":"INFO","msg":"writer: Do: started","stream_id":"rgv78lnh"}
+{"time":"2025-02-01T05:33:50.49212+09:00","level":"INFO","msg":"handler: started","stream_id":"rgv78lnh"}
+{"time":"2025-02-01T05:33:50.492178+09:00","level":"INFO","msg":"sender: started","stream_id":"rgv78lnh"}
+{"time":"2025-02-01T05:33:50.750029+09:00","level":"INFO","msg":"Starting system monitor"}

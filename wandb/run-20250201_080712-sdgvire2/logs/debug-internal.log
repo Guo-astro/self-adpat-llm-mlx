@@ -1,0 +1,7 @@
+{"time":"2025-02-01T08:07:12.979028+09:00","level":"INFO","msg":"stream: starting","core version":"0.19.5","symlink path":"/Users/guo/OSS/self-adpat-llm-mlx/wandb/run-20250201_080712-sdgvire2/logs/debug-core.log"}
+{"time":"2025-02-01T08:07:13.095097+09:00","level":"INFO","msg":"created new stream","id":"sdgvire2"}
+{"time":"2025-02-01T08:07:13.095148+09:00","level":"INFO","msg":"stream: started","id":"sdgvire2"}
+{"time":"2025-02-01T08:07:13.095158+09:00","level":"INFO","msg":"handler: started","stream_id":"sdgvire2"}
+{"time":"2025-02-01T08:07:13.095204+09:00","level":"INFO","msg":"sender: started","stream_id":"sdgvire2"}
+{"time":"2025-02-01T08:07:13.095227+09:00","level":"INFO","msg":"writer: Do: started","stream_id":"sdgvire2"}
+{"time":"2025-02-01T08:07:13.367505+09:00","level":"INFO","msg":"Starting system monitor"}

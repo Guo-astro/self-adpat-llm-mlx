@@ -1,0 +1,7 @@
+{"time":"2025-02-01T08:28:54.900602+09:00","level":"INFO","msg":"stream: starting","core version":"0.19.5","symlink path":"/Users/guo/OSS/self-adpat-llm-mlx/wandb/run-20250201_082854-38daxrkf/logs/debug-core.log"}
+{"time":"2025-02-01T08:28:55.015391+09:00","level":"INFO","msg":"created new stream","id":"38daxrkf"}
+{"time":"2025-02-01T08:28:55.015436+09:00","level":"INFO","msg":"stream: started","id":"38daxrkf"}
+{"time":"2025-02-01T08:28:55.015457+09:00","level":"INFO","msg":"writer: Do: started","stream_id":"38daxrkf"}
+{"time":"2025-02-01T08:28:55.015463+09:00","level":"INFO","msg":"handler: started","stream_id":"38daxrkf"}
+{"time":"2025-02-01T08:28:55.015537+09:00","level":"INFO","msg":"sender: started","stream_id":"38daxrkf"}
+{"time":"2025-02-01T08:28:55.329822+09:00","level":"INFO","msg":"Starting system monitor"}

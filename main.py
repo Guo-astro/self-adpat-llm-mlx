@@ -8,7 +8,7 @@ import numpy as np
 from mlx.utils import tree_flatten
 
 from src import datasets
-from src.transformer_svd import TransformerLM
+from src.Linear import TransformerLM
 
 # New imports for Wandb, system monitoring, and Rich
 import wandb
@@ -20,9 +20,12 @@ from rich.table import Table
 from rich.panel import Panel
 from rich.progress import Progress, BarColumn, TextColumn, TimeElapsedColumn, TimeRemainingColumn
 
+from src.SVDLinear import TransformerLMSVD
+
+
 def to_samples(context_size, dataset):
     tokens = dataset.size
-    window_size = context_size + 1  # include target
+    window_size = context_size + 1  # include target token
     samples = tokens - window_size + 1
     X = np.lib.stride_tricks.as_strided(
         dataset,
@@ -30,6 +33,7 @@ def to_samples(context_size, dataset):
         strides=(dataset.itemsize, dataset.itemsize),
     )
     return X[:, :-1], X[:, 1:]
+
 
 def iterate_batches(batch_size, context_size, dataset):
     inputs, targets = to_samples(context_size, dataset)
@@ -44,8 +48,8 @@ def iterate_batches(batch_size, context_size, dataset):
         if s >= inputs.shape[0]:
             s = 0
 
+
 def main(args):
-    # Initialize Rich Console
     console = Console()
 
     # Initialize Wandb
@@ -55,40 +59,27 @@ def main(args):
     )
     config = wandb.config
 
-    # Use args for training parameters
     batch_size = args.batch_size
     context_size = args.context_size
     steps_per_eval = args.steps_per_eval
     steps_per_report = args.steps_per_report
 
-    # Initialize NVIDIA Management Library for GPU monitoring
-    if args.gpu:
-        pynvml.nvmlInit()
-        handle = pynvml.nvmlDeviceGetHandleByIndex(0)  # Assuming single GPU
-    else:
-        handle = None
-
-    # Load vocab and dataset:
+    # Load vocab and dataset.
     vocab, train, valid, test = datasets.load_dataset(args.dataset)
-    # Initialize model:
+
+    # Initialize model using our SVD-based Transformer.
     model = TransformerLM(
         len(vocab), args.num_blocks, args.dim, args.num_heads, args.checkpoint
     )
     mx.eval(model.parameters())
-    nparams = sum(
-        x.size for k, x in tree_flatten(model.parameters()) if "embedding" not in k
-    )
+    nparams = sum(x.size for _, x in tree_flatten(model.parameters()) if "embedding" not in _)
 
-    # Beautiful Header Panel
     header = Panel.fit(
         f"Training a Transformer with [bold magenta]{nparams / 1024 ** 2:.3f} M[/bold magenta] Parameters",
         title="Model Information",
         border_style="green",
     )
     console.print(header)
-
-    # Log model graph to Wandb (optional, if supported by mlx)
-    # wandb.watch(model, log="all")  # Uncomment if mlx supports Wandb watch
 
     def loss_fn(model, x, y, reduce=True):
         logits = model(x)
@@ -107,7 +98,7 @@ def main(args):
             bx, by = map(mx.array, (bx, by))
             losses = loss_fn(model, bx, by, reduce=False)
             loss += mx.sum(losses).item()
-        return loss / len(targets)
+        return loss / targets.size
 
     state = [model.state, optimizer.state]
 
@@ -122,7 +113,6 @@ def main(args):
     losses = []
     tic = time.perf_counter()
 
-    # Initialize Progress Bar
     progress = Progress(
         TextColumn("[progress.description]{task.description}"),
         BarColumn(),
@@ -143,7 +133,6 @@ def main(args):
             loss = step(inputs, targets)
             mx.eval(state)
             losses.append(loss.item())
-
             progress.update(task, advance=1)
 
             if (it + 1) % steps_per_report == 0:
@@ -151,44 +140,27 @@ def main(args):
                 toc = time.perf_counter()
                 it_per_sec = steps_per_report / (toc - tic)
 
-                # System Metrics
                 cpu_percent = psutil.cpu_percent()
                 memory_info = psutil.virtual_memory()
-                memory_used = memory_info.used / (1024 ** 3)  # Convert to GB
-                memory_total = memory_info.total / (1024 ** 3)  # Convert to GB
+                memory_used = memory_info.used / (1024 ** 3)
+                memory_total = memory_info.total / (1024 ** 3)
 
-                if args.gpu and handle is not None:
-                    mem_info = pynvml.nvmlDeviceGetMemoryInfo(handle)
-                    gpu_mem_used = mem_info.used / (1024 ** 2)  # Convert to MB
-                    gpu_mem_total = mem_info.total / (1024 ** 2)  # Convert to MB
-                else:
-                    gpu_mem_used = None
-                    gpu_mem_total = None
-
-                # Log to Wandb
                 wandb.log({
                     "train_loss": train_loss,
                     "it_per_sec": it_per_sec,
                     "cpu_usage_percent": cpu_percent,
                     "memory_used_GB": memory_used,
                     "memory_total_GB": memory_total,
-                    "gpu_memory_used_MB": gpu_mem_used,
-                    "gpu_memory_total_MB": gpu_mem_total,
                     "iteration": it + 1
                 })
 
-                # Create a Beautiful Table for Console Output
                 table = Table(title=f"Iteration {it + 1}", border_style="blue")
                 table.add_column("Metric", style="cyan", no_wrap=True)
                 table.add_column("Value", style="magenta")
-
                 table.add_row("Train Loss", f"{train_loss:.4f}")
                 table.add_row("Iterations/sec", f"{it_per_sec:.2f}")
                 table.add_row("CPU Usage", f"{cpu_percent}%")
                 table.add_row("Memory Used (GB)", f"{memory_used:.2f} / {memory_total:.2f}")
-                if args.gpu and handle is not None:
-                    table.add_row("GPU Memory Used (MB)", f"{gpu_mem_used:.2f} / {gpu_mem_total:.2f}")
-
                 console.print(table)
 
                 losses = []
@@ -200,7 +172,6 @@ def main(args):
                 val_ppl = math.exp(val_loss)
                 eval_time = toc - tic
 
-                # Log validation metrics to Wandb
                 wandb.log({
                     "val_loss": val_loss,
                     "val_ppl": val_ppl,
@@ -208,7 +179,6 @@ def main(args):
                     "iteration": it + 1
                 })
 
-                # Create a Validation Panel
                 val_panel = Panel.fit(
                     f"Validation at Iteration {it + 1}\n"
                     f"• [bold]Val Loss[/bold]: {val_loss:.4f}\n"
@@ -218,7 +188,6 @@ def main(args):
                     border_style="yellow",
                 )
                 console.print(val_panel)
-
                 tic = time.perf_counter()
 
     if args.eval_test:
@@ -232,15 +201,13 @@ def main(args):
             border_style="red",
         )
         console.print(test_panel)
-
-        # Log test metrics to Wandb
         wandb.log({
             "test_loss": test_loss,
             "test_ppl": test_ppl
         })
 
-    # Finish Wandb run
     wandb.finish()
+
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser("Train a decoder-only Transformer LM with MLX.")
@@ -307,7 +274,6 @@ if __name__ == "__main__":
         action="store_true",
         help="Evaluate on the test set after training",
     )
-    # New arguments for Wandb
     parser.add_argument(
         "--wandb_project",
         type=str,
@@ -322,12 +288,8 @@ if __name__ == "__main__":
     )
 
     args = parser.parse_args()
-
-    # Set seed for reproducibility
     np.random.seed(args.seed)
     mx.random.seed(args.seed)
 
-
     mx.set_default_device(mx.gpu)
-
     main(args)
