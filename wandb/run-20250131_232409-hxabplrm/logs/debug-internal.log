@@ -1,7 +1,0 @@
-{"time":"2025-01-31T23:24:09.707262+09:00","level":"INFO","msg":"stream: starting","core version":"0.19.5","symlink path":"/Users/guo/OSS/self-adpat-llm-mlx/wandb/run-20250131_232409-hxabplrm/logs/debug-core.log"}
-{"time":"2025-01-31T23:24:09.819301+09:00","level":"INFO","msg":"created new stream","id":"hxabplrm"}
-{"time":"2025-01-31T23:24:09.819342+09:00","level":"INFO","msg":"stream: started","id":"hxabplrm"}
-{"time":"2025-01-31T23:24:09.819363+09:00","level":"INFO","msg":"handler: started","stream_id":"hxabplrm"}
-{"time":"2025-01-31T23:24:09.81936+09:00","level":"INFO","msg":"writer: Do: started","stream_id":"hxabplrm"}
-{"time":"2025-01-31T23:24:09.819378+09:00","level":"INFO","msg":"sender: started","stream_id":"hxabplrm"}
-{"time":"2025-01-31T23:24:10.085469+09:00","level":"INFO","msg":"Starting system monitor"}

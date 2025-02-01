@@ -1,7 +1,0 @@
-{"time":"2025-02-01T08:05:43.571361+09:00","level":"INFO","msg":"stream: starting","core version":"0.19.5","symlink path":"/Users/guo/OSS/self-adpat-llm-mlx/wandb/run-20250201_080543-xnneae8w/logs/debug-core.log"}
-{"time":"2025-02-01T08:05:43.682314+09:00","level":"INFO","msg":"created new stream","id":"xnneae8w"}
-{"time":"2025-02-01T08:05:43.682435+09:00","level":"INFO","msg":"stream: started","id":"xnneae8w"}
-{"time":"2025-02-01T08:05:43.682457+09:00","level":"INFO","msg":"writer: Do: started","stream_id":"xnneae8w"}
-{"time":"2025-02-01T08:05:43.682475+09:00","level":"INFO","msg":"sender: started","stream_id":"xnneae8w"}
-{"time":"2025-02-01T08:05:43.68251+09:00","level":"INFO","msg":"handler: started","stream_id":"xnneae8w"}
-{"time":"2025-02-01T08:05:43.959053+09:00","level":"INFO","msg":"Starting system monitor"}

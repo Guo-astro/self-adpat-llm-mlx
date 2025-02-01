@@ -1,6 +1,0 @@
-{"time":"2025-01-31T21:58:23.2166+09:00","level":"INFO","msg":"stream: starting","core version":"0.19.5","symlink path":"/Users/guo/OSS/self-adpat-llm-mlx/wandb/run-20250131_215822-m5w9xxxt/logs/debug-core.log"}
-{"time":"2025-01-31T21:58:23.531846+09:00","level":"INFO","msg":"created new stream","id":"m5w9xxxt"}
-{"time":"2025-01-31T21:58:23.531913+09:00","level":"INFO","msg":"stream: started","id":"m5w9xxxt"}
-{"time":"2025-01-31T21:58:23.531959+09:00","level":"INFO","msg":"writer: Do: started","stream_id":"m5w9xxxt"}
-{"time":"2025-01-31T21:58:23.531999+09:00","level":"INFO","msg":"handler: started","stream_id":"m5w9xxxt"}
-{"time":"2025-01-31T21:58:23.53203+09:00","level":"INFO","msg":"sender: started","stream_id":"m5w9xxxt"}

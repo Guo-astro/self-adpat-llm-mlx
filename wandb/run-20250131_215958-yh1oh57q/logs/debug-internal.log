@@ -1,8 +1,0 @@
-{"time":"2025-01-31T21:59:58.40617+09:00","level":"INFO","msg":"stream: starting","core version":"0.19.5","symlink path":"/Users/guo/OSS/self-adpat-llm-mlx/wandb/run-20250131_215958-yh1oh57q/logs/debug-core.log"}
-{"time":"2025-01-31T21:59:58.516506+09:00","level":"INFO","msg":"created new stream","id":"yh1oh57q"}
-{"time":"2025-01-31T21:59:58.516556+09:00","level":"INFO","msg":"stream: started","id":"yh1oh57q"}
-{"time":"2025-01-31T21:59:58.516575+09:00","level":"INFO","msg":"writer: Do: started","stream_id":"yh1oh57q"}
-{"time":"2025-01-31T21:59:58.516581+09:00","level":"INFO","msg":"handler: started","stream_id":"yh1oh57q"}
-{"time":"2025-01-31T21:59:58.516688+09:00","level":"INFO","msg":"sender: started","stream_id":"yh1oh57q"}
-{"time":"2025-01-31T21:59:58.862322+09:00","level":"INFO","msg":"Starting system monitor"}
-{"time":"2025-01-31T22:00:59.640995+09:00","level":"INFO","msg":"api: retrying HTTP error","status":502,"url":"https://api.wandb.ai/files/goastro-me/transformer-training/yh1oh57q/file_stream","body":"\n<html><head>\n<meta http-equiv=\"content-type\" content=\"text/html;charset=utf-8\">\n<title>502 Server Error</title>\n</head>\n<body text=#000000 bgcolor=#ffffff>\n<h1>Error: Server Error</h1>\n<h2>The server encountered a temporary error and could not complete your request.<p>Please try again in 30 seconds.</h2>\n<h2></h2>\n</body></html>\n"}

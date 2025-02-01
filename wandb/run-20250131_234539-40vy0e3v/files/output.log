@@ -1,8 +1,0 @@
-Model type: <class 'src.transformer_svd.TransformerLM'>
-Is model a subclass of nn.Module? yes
-Does model have a __call__ method? True
-Model's parameters:
- - embedding
- - pe
- - transformer
- - out_proj
