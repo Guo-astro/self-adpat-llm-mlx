@@ -7,9 +7,6 @@ import mlx.optimizers as optim
 import numpy as np
 from mlx.utils import tree_flatten
 
-from src import datasets
-from src.Linear import TransformerLM
-
 # New imports for Wandb, system monitoring, and Rich
 import wandb
 import psutil
@@ -20,7 +17,8 @@ from rich.table import Table
 from rich.panel import Panel
 from rich.progress import Progress, BarColumn, TextColumn, TimeElapsedColumn, TimeRemainingColumn
 
-from src.SVDLinear import TransformerLMSVD
+from src.transformer_lm import datasets
+from src.transformer_lm.Linear import TransformerLM
 
 
 def to_samples(context_size, dataset):

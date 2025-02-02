@@ -6,10 +6,19 @@ readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
     "datasets>=3.2.0",
+    "mlx-data>=0.0.2",
     "mlx>=0.22.0",
     "numpy>=2.2.2",
+    "pillow>=11.1.0",
     "psutil>=6.1.1",
     "pynvml>=12.0.0",
     "rich>=13.9.4",
+    "scikit-learn>=1.6.1",
+    "torch>=2.6.0",
+    "transformers>=4.48.2",
     "wandb>=0.19.5",
+    "huggingface-hub>=0.28.1",
+    "protobuf>=5.29.3",
+    "pyyaml>=6.0.2",
+    "jinja2>=3.1.5",
 ]
