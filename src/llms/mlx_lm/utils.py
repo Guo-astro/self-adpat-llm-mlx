@@ -43,6 +43,7 @@ MODEL_REMAPPING = {
     "mistral": "llama",  # mistral is compatible with llama
     "phi-msft": "phixtral",
     "falcon_mamba": "mamba",
+    "qwen2":"qwen2",
 }
 
 MAX_FILE_SIZE_GB = 5
@@ -132,7 +133,7 @@ def _get_classes(config: dict):
     model_type = config["model_type"]
     model_type = MODEL_REMAPPING.get(model_type, model_type)
     try:
-        arch = importlib.import_module(f"mlx_lm.models.{model_type}")
+        arch = importlib.import_module(f"src.llms.mlx_lm.models.{model_type}")
     except ImportError:
         msg = f"Model type {model_type} not supported."
         logging.error(msg)
@@ -211,7 +212,7 @@ def generate_step(
     model: nn.Module,
     *,
     max_tokens: int = 256,
-    sampler: Optional[Callable[mx.array, mx.array]] = None,
+    sampler: Optional[Callable[[mx.array], mx.array]] = None,
     logits_processors: Optional[List[Callable[[mx.array, mx.array], mx.array]]] = None,
     max_kv_size: Optional[int] = None,
     prompt_cache: Optional[Any] = None,
@@ -219,7 +220,7 @@ def generate_step(
     kv_bits: Optional[int] = None,
     kv_group_size: int = 64,
     quantized_kv_start: int = 0,
-    prompt_progress_callback: Optional[Callable[int, int]] = None,
+    prompt_progress_callback: Optional[Callable[[int], int]] = None,
 ) -> Generator[Tuple[mx.array, mx.array], None, None]:
     """
     A generator producing token ids based on the given prompt from the model.
@@ -331,7 +332,7 @@ def speculative_generate_step(
     *,
     num_draft_tokens=2,
     max_tokens: int = 256,
-    sampler: Optional[Callable[mx.array, mx.array]] = None,
+    sampler: Optional[Callable[[mx.array], mx.array]] = None,
     logits_processors: Optional[List[Callable[[mx.array, mx.array], mx.array]]] = None,
     prompt_cache: Optional[Any] = None,
     prefill_step_size: int = 512,
@@ -627,6 +628,7 @@ def load_config(model_path: Path) -> dict:
 def load_model(
     model_path: Path,
     lazy: bool = False,
+    strict: bool = True,
     model_config: dict = {},
     get_model_classes: Callable[[dict], Tuple[Type[nn.Module], Type]] = _get_classes,
 ) -> nn.Module:
@@ -638,6 +640,8 @@ def load_model(
         lazy (bool): If False eval the model parameters to make sure they are
             loaded in memory before returning, otherwise they will be loaded
             when needed. Default: ``False``
+        strict (bool): Whether or not to raise an exception if weights don't
+            match. Default: ``True``
         model_config (dict, optional): Optional configuration parameters for the
             model. Defaults to an empty dictionary.
         get_model_classes (Callable[[dict], Tuple[Type[nn.Module], Type]], optional):
@@ -660,7 +664,7 @@ def load_model(
         # Try weight for back-compat
         weight_files = glob.glob(str(model_path / "weight*.safetensors"))
 
-    if not weight_files:
+    if not weight_files and strict:
         logging.error(f"No safetensors found in {model_path}")
         raise FileNotFoundError(f"No safetensors found in {model_path}")
 
@@ -694,7 +698,7 @@ def load_model(
             class_predicate=class_predicate,
         )
 
-    model.load_weights(list(weights.items()))
+    model.load_weights(list(weights.items()), strict=strict)
 
     if not lazy:
         mx.eval(model.parameters())
@@ -811,7 +815,7 @@ def upload_to_hub(path: str, upload_repo: str, hf_path: str):
         ```
 
         ```python
-        from src.llms.mlx_lm import load, generate
+        from mlx_lm import load, generate
 
         model, tokenizer = load("{upload_repo}")
 

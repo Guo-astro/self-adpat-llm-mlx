@@ -1,8 +1,38 @@
 import json
 from pathlib import Path
-from typing import Dict, List, Optional
+from typing import Dict, List, Optional, Tuple
 
 from transformers import PreTrainedTokenizer
+
+
+class GRPODataset:
+    """
+    Dataset wrapper for GRPO training data.
+    Each example should have a 'prompt' and 'answer' field.
+    Returns data in (prompt_tokens, answer_tokens, prompt_str, answer_str) tuple format.
+    """
+    def __init__(
+        self,
+        data: List[Dict[str, str]],
+        tokenizer: PreTrainedTokenizer,
+        prompt_key: str = "prompt",
+        answer_key: str = "answer"
+    ):
+        self._data = []
+        for item in data:
+            prompt_str = str(item[prompt_key])
+            answer_str = str(item[answer_key])
+            prompt_tokens = tokenizer.encode(prompt_str)
+            answer_tokens = tokenizer.encode(answer_str)
+            self._data.append((prompt_tokens, answer_tokens, prompt_str, answer_str))
+
+    def __getitem__(self, idx: int) -> Tuple[List[int], List[int], str, str]:
+        """Returns a (prompt_tokens, answer_tokens, prompt_str, answer_str) tuple."""
+        return self._data[idx]
+
+    def __len__(self) -> int:
+        """Returns the number of examples in the dataset."""
+        return len(self._data)
 
 
 class Dataset:
@@ -90,8 +120,11 @@ def create_dataset(
     prompt_feature = prompt_feature or "prompt"
     completion_feature = completion_feature or "completion"
     sample = data[0]
+
     if "messages" in sample:
         return ChatDataset(data, tokenizer)
+    elif "prompt" in sample and "answer" in sample:
+        return GRPODataset(data, tokenizer, "prompt", "answer")  # Use GRPO Dataset
     elif prompt_feature in sample and completion_feature in sample:
         return CompletionsDataset(data, tokenizer, prompt_feature, completion_feature)
     elif "text" in sample:

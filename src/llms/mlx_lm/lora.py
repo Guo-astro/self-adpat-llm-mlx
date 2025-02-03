@@ -12,16 +12,17 @@ import mlx.optimizers as optim
 import numpy as np
 import yaml
 
-from .tokenizer_utils import TokenizerWrapper
-from .tuner.datasets import load_dataset
-from .tuner.trainer import TrainingArgs, TrainingCallback, evaluate, train
-from .tuner.utils import (
+from  src.llms.mlx_lm.tokenizer_utils import TokenizerWrapper
+from  src.llms.mlx_lm.tuner.datasets import load_dataset
+from  src.llms.mlx_lm.tuner.trainer import TrainingArgs, TrainingCallback, evaluate, train
+from  src.llms.mlx_lm.tuner.grpo_trainer import GRPOTrainingArgs, evaluate_grpo, train_grpo
+from  src.llms.mlx_lm.tuner.utils import (
     build_schedule,
     linear_to_lora_layers,
     load_adapters,
     print_trainable_parameters,
 )
-from .utils import load, save_config
+from  src.llms.mlx_lm.utils import load, save_config
 
 yaml_loader = yaml.SafeLoader
 yaml_loader.add_implicit_resolver(
@@ -40,10 +41,11 @@ yaml_loader.add_implicit_resolver(
 )
 
 CONFIG_DEFAULTS = {
-    "model": "mlx_model",
-    "train": False,
+    "model": "Qwen/Qwen2-0.5B",
+    "train": True,
+    "training_mode": "grpo",
     "fine_tune_type": "lora",
-    "data": "data/",
+    "data": "Goastro/mlx-grpo-dataset",
     "seed": 0,
     "num_layers": 16,
     "batch_size": 4,
@@ -61,6 +63,10 @@ CONFIG_DEFAULTS = {
     "config": None,
     "grad_checkpoint": False,
     "lr_schedule": None,
+    "reference_model_path": None,
+    "group_size": 4,
+    "beta": 0.1,
+    "epsilon": 1e-4,
     "lora_parameters": {"rank": 8, "alpha": 16, "dropout": 0.0, "scale": 10.0},
 }
 
@@ -93,6 +99,12 @@ def build_parser():
         type=str,
         choices=["lora", "dora", "full"],
         help="Type of fine-tuning to perform: lora, dora, or full.",
+    )
+    parser.add_argument(
+        "--training-mode",
+        type=str,
+        choices=["normal", "grpo"],
+        help="Training mode: normal or GRPO",
     )
     parser.add_argument(
         "--num-layers",
@@ -161,20 +173,40 @@ def build_parser():
         default=None,
     )
     parser.add_argument("--seed", type=int, help="The PRNG seed")
+
+    # GRPO args
+    parser.add_argument(
+        "--group-size",
+        type=int,
+        help="Number of responses per prompt.",
+        default=4,
+    )
+    parser.add_argument(
+        "--beta",
+        type=float,
+        help="KL penalty coefficient.",
+        default=0.1,
+    )
+    parser.add_argument(
+        "--epsilon",
+        type=float,
+        help="The Epsilon for numerical stability.",
+        default=1e-4,
+    )
     return parser
 
 
 def train_model(
-    args,
-    model: nn.Module,
-    tokenizer: TokenizerWrapper,
-    train_set,
-    valid_set,
-    training_callback: TrainingCallback = None,
+        args,
+        model: nn.Module,
+        tokenizer: TokenizerWrapper,
+        train_set,
+        valid_set,
+        training_callback: TrainingCallback = None,
 ):
     model.freeze()
     if args.fine_tune_type == "full":
-        for l in model.layers[-min(args.num_layers, 0) :]:
+        for l in model.layers[-min(args.num_layers, 0):]:
             l.unfreeze()
     elif args.fine_tune_type in ["lora", "dora"]:
         # Convert linear layers to lora/dora layers and unfreeze in the process
@@ -220,32 +252,98 @@ def train_model(
         )
     )
     # Train model
-    train(
-        model=model,
-        tokenizer=tokenizer,
-        args=training_args,
-        optimizer=opt,
-        train_dataset=train_set,
-        val_dataset=valid_set,
-        training_callback=training_callback,
-    )
+    if args.training_mode == "grpo":
+        training_args = GRPOTrainingArgs(
+            batch_size=args.batch_size,
+            iters=args.iters,
+            val_batches=args.val_batches,
+            steps_per_report=args.steps_per_report,
+            steps_per_eval=args.steps_per_eval,
+            steps_per_save=args.save_every,
+            adapter_file=adapter_file,
+            max_seq_length=args.max_seq_length,
+            grad_checkpoint=args.grad_checkpoint,
+            beta=args.beta,
+            group_size=args.group_size,
+            epsilon=args.epsilon,
+            reference_model_path=args.reference_model_path
+        )
+
+        if args.reference_model_path:
+            reference_model, _ = load(args.reference_model_path)
+            reference_model = reference_model.freeze()
+        else:
+            reference_model, _ = None, None
+
+        train_grpo(
+            model=model,
+            ref_model=reference_model,
+            tokenizer=tokenizer,
+            optimizer=opt,
+            train_dataset=train_set,
+            val_dataset=valid_set,
+            args=training_args,
+            training_callback=training_callback,
+        )
+    else:
+        training_args = TrainingArgs(
+            batch_size=args.batch_size,
+            iters=args.iters,
+            val_batches=args.val_batches,
+            steps_per_report=args.steps_per_report,
+            steps_per_eval=args.steps_per_eval,
+            steps_per_save=args.save_every,
+            adapter_file=adapter_file,
+            max_seq_length=args.max_seq_length,
+            grad_checkpoint=args.grad_checkpoint
+        )
+
+        train(
+            model=model,
+            tokenizer=tokenizer,
+            args=training_args,
+            optimizer=opt,
+            train_dataset=train_set,
+            val_dataset=valid_set,
+            training_callback=training_callback,
+        )
 
 
 def evaluate_model(args, model: nn.Module, tokenizer: TokenizerWrapper, test_set):
     model.eval()
 
-    test_loss = evaluate(
-        model=model,
-        dataset=test_set,
-        tokenizer=tokenizer,
-        batch_size=args.batch_size,
-        num_batches=args.test_batches,
-        max_seq_length=args.max_seq_length,
-    )
+    if args.training_mode == "grpo":
+        if args.reference_model_path:
+            reference_model, _ = load(args.reference_model_path)
+        else:
+            reference_model = model
 
-    test_ppl = math.exp(test_loss)
+        test_loss, test_rewards = evaluate_grpo(
+            model=model,
+            ref_model=reference_model,
+            dataset=test_set,
+            tokenizer=tokenizer,
+            batch_size=args.batch_size,
+            num_batches=args.test_batches,
+            max_seq_length=args.max_seq_length,
+            beta=args.beta,
+            group_size=args.group_size,
+            epsilon=args.epsilon
+        )
+        print(f"Test loss {test_loss:.3f}, Rewards: {test_rewards[0]:.3f}, {test_rewards[1]:.3f}")
+    else:
+        test_loss = evaluate(
+            model=model,
+            dataset=test_set,
+            tokenizer=tokenizer,
+            batch_size=args.batch_size,
+            num_batches=args.test_batches,
+            max_seq_length=args.max_seq_length,
+        )
 
-    print(f"Test loss {test_loss:.3f}, Test ppl {test_ppl:.3f}.")
+        test_ppl = math.exp(test_loss)
+
+        print(f"Test loss {test_loss:.3f}, Test ppl {test_ppl:.3f}.")
 
 
 def run(args, training_callback: TrainingCallback = None):
