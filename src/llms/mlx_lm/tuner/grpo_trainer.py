@@ -10,8 +10,11 @@ import mlx.nn as nn
 import numpy as np
 from mlx.utils import tree_flatten
 
-from .trainer import grad_checkpoint, TrainingArgs, TrainingCallback, average_gradients, iterate_batches
+# Import wandb and psutil for monitoring and logging
+import wandb
+import psutil
 
+from .trainer import grad_checkpoint, TrainingArgs, TrainingCallback, average_gradients, iterate_batches
 
 
 @dataclass
@@ -42,7 +45,6 @@ def generate_for_grpo(
         temperature=1.0
 ):
     try:
-
         # Ensure prompt is the right shape
         if len(prompt.shape) == 1:
             prompt = prompt[None, :]
@@ -355,7 +357,6 @@ def grpo_loss(
             completions=all_completion_texts,
             answer=answer_text
         ))
-        # func_grouped_rewards = func_rewards.reshape(batch_size, group_size)
         reward_metrics[f'reward_func_{i}_mean'] = mx.mean(func_rewards)
         reward_metrics[f'reward_func_{i}_std'] = mx.std(func_rewards)
 
@@ -546,10 +547,19 @@ def train_grpo(
 
     state = [model.state, optimizer.state]
 
-    def step(batch):
+    # Initialize wandb at the beginning of training.
+    if rank == 0:
+        wandb.init(project="transformer-training", config={
+            "batch_size": args.batch_size,
+            "learning_rate": optimizer.learning_rate.item(),
+            # Add additional config parameters if needed.
+        })
 
+    loss_value_and_grad = nn.value_and_grad(model, loss)
+
+    def step(batch):
         # Forward and backward pass
-        (loss, toks, metrics), grad = loss_value_and_grad(
+        (loss_val, toks, metrics), grad = loss_value_and_grad(
             model,
             tokenizer=tokenizer,
             batch=batch,
@@ -566,9 +576,7 @@ def train_grpo(
         # Model update
         optimizer.update(model, grad)
 
-        return loss, toks, metrics
-
-    loss_value_and_grad = nn.value_and_grad(model, loss)
+        return loss_val, toks, metrics
 
     losses = 0
     n_tokens = 0
@@ -626,7 +634,6 @@ def train_grpo(
                     f"Val kl {val_metrics['kl']:.3f}"
                 )
 
-                # Add reward function specific metrics
                 for i in range(len(reward_funcs)):
                     val_metrics_str += (
                         f", Val reward_func_{i}_mean {val_metrics[f'reward_func_{i}_mean']:.3f}, "
@@ -649,8 +656,8 @@ def train_grpo(
 
             start = time.perf_counter()
 
-        loss, toks, metrics = step(batch)
-        losses += loss
+        loss_val, toks, metrics = step(batch)
+        losses += loss_val
         n_tokens += toks
         steps += 1
         for k, v in metrics.items():
@@ -679,8 +686,6 @@ def train_grpo(
                     f"Grouped rewards std {avg_metrics['grouped_rewards_std']:.3f}, "
                     f"KL {avg_metrics['kl']:.3f}"
                 )
-
-                # Add reward function specific metrics
                 for i in range(len(reward_funcs)):
                     train_metrics_str += (
                         f", Reward func {i} mean {avg_metrics[f'reward_func_{i}_mean']:.3f}, "
@@ -695,6 +700,25 @@ def train_grpo(
                     f"Peak mem {peak_mem:.3f} GB",
                     flush=True,
                 )
+
+                # Collect system metrics using psutil
+                cpu_percent = psutil.cpu_percent(interval=None)
+                mem = psutil.virtual_memory()
+                memory_used = mem.used / (1024 ** 3)  # bytes to GB
+                memory_total = mem.total / (1024 ** 3)  # bytes to GB
+
+                # Log metrics to wandb
+                wandb.log({
+                    "iteration": it + 1,
+                    "train_loss": train_loss,
+                    "it_per_sec": it_sec,
+                    "tokens_per_sec": tokens_sec,
+                    "learning_rate": learning_rate,
+                    "cpu_usage_percent": cpu_percent,
+                    "memory_used_GB": memory_used,
+                    "memory_total_GB": memory_total,
+                    "peak_memory_GB": peak_mem,
+                })
 
             if training_callback is not None:
                 training_callback.on_train_loss_report({
@@ -718,7 +742,7 @@ def train_grpo(
             adapter_weights = dict(tree_flatten(model.trainable_parameters()))
             mx.save_safetensors(str(args.adapter_file), adapter_weights)
             checkpoint = (
-                    Path(args.adapter_file).parent / f"{it:07d}_adapters.safetensors"
+                Path(args.adapter_file).parent / f"{it:07d}_adapters.safetensors"
             )
             mx.save_safetensors(str(checkpoint), adapter_weights)
             print(
@@ -730,3 +754,4 @@ def train_grpo(
     adapter_weights = dict(tree_flatten(model.trainable_parameters()))
     mx.save_safetensors(str(args.adapter_file), adapter_weights)
     print(f"Saved final weights to {args.adapter_file}.")
+
