@@ -12,17 +12,17 @@ import mlx.optimizers as optim
 import numpy as np
 import yaml
 
-from  src.llms.mlx_lm.tokenizer_utils import TokenizerWrapper
-from  src.llms.mlx_lm.tuner.datasets import load_dataset
-from  src.llms.mlx_lm.tuner.trainer import TrainingArgs, TrainingCallback, evaluate, train
-from  src.llms.mlx_lm.tuner.grpo_trainer import GRPOTrainingArgs, evaluate_grpo, train_grpo
-from  src.llms.mlx_lm.tuner.utils import (
+from src.llms.mlx_lm.tokenizer_utils import TokenizerWrapper
+from src.llms.mlx_lm.tuner.datasets import load_dataset
+from src.llms.mlx_lm.tuner.trainer import TrainingArgs, TrainingCallback, evaluate, train
+from src.llms.mlx_lm.tuner.grpo_trainer import GRPOTrainingArgs, evaluate_grpo, train_grpo
+from src.llms.mlx_lm.tuner.utils import (
     build_schedule,
     linear_to_lora_layers,
     load_adapters,
     print_trainable_parameters,
 )
-from  src.llms.mlx_lm.utils import load, save_config
+from src.llms.mlx_lm.utils import load, save_config
 
 yaml_loader = yaml.SafeLoader
 yaml_loader.add_implicit_resolver(
@@ -41,13 +41,13 @@ yaml_loader.add_implicit_resolver(
 )
 
 CONFIG_DEFAULTS = {
-    "model": "Qwen/Qwen2-0.5B",
+    "model": "openai-community/gpt2",
     "train": True,
     "training_mode": "grpo",
     "fine_tune_type": "lora",
     "data": "Goastro/mlx-grpo-dataset",
     "seed": 0,
-    "num_layers": 16,
+    "num_layers": 12,
     "batch_size": 4,
     "iters": 1000,
     "val_batches": 25,
@@ -59,15 +59,19 @@ CONFIG_DEFAULTS = {
     "save_every": 100,
     "test": False,
     "test_batches": 500,
-    "max_seq_length": 2048,
+    "max_seq_length": 512,
     "config": None,
     "grad_checkpoint": False,
     "lr_schedule": None,
+    "lora_parameters": {"rank": 8, "alpha": 16, "dropout": 0.0, "scale": 10.0},
+    # GRPO args
     "reference_model_path": None,
     "group_size": 4,
     "beta": 0.1,
     "epsilon": 1e-4,
-    "lora_parameters": {"rank": 8, "alpha": 16, "dropout": 0.0, "scale": 10.0},
+    "max_completion_length": 512,
+    "use_chat_template": False,
+    "use_prompt": False,
 }
 
 
@@ -175,11 +179,18 @@ def build_parser():
     parser.add_argument("--seed", type=int, help="The PRNG seed")
 
     # GRPO args
+    # GRPO args
     parser.add_argument(
         "--group-size",
         type=int,
-        help="Number of responses per prompt.",
+        help="Number of generations.",
         default=4,
+    )
+    parser.add_argument(
+        "--max-completion-length",
+        type=int,
+        help="Maximum length of the prompt. If the prompt is longer than this value, it will be truncated left.",
+        default=512,
     )
     parser.add_argument(
         "--beta",
@@ -192,6 +203,18 @@ def build_parser():
         type=float,
         help="The Epsilon for numerical stability.",
         default=1e-4,
+    )
+    parser.add_argument(
+        "--use-chat-template",
+        type=bool,
+        help="If the model is a Chat model, use the Chat template.",
+        default=False,
+    )
+    parser.add_argument(
+        "--use-prompt",
+        type=bool,
+        help="Rather to use the prompt from teh R1 paper.",
+        default=False,
     )
     return parser
 

@@ -17,9 +17,10 @@
         "scale": 10.0
     },
     "lr_schedule": null,
-    "max_seq_length": 2048,
-    "model": "Qwen/Qwen2-0.5B",
-    "num_layers": 16,
+    "max_completion_length": 512,
+    "max_seq_length": 512,
+    "model": "openai-community/gpt2",
+    "num_layers": 12,
     "reference_model_path": null,
     "resume_adapter_file": null,
     "save_every": 100,
@@ -30,5 +31,7 @@
     "test_batches": 500,
     "train": true,
     "training_mode": "grpo",
+    "use_chat_template": false,
+    "use_prompt": false,
     "val_batches": 25
 }

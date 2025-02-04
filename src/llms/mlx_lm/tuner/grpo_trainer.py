@@ -10,10 +10,6 @@ import mlx.nn as nn
 import numpy as np
 from mlx.utils import tree_flatten
 
-# Import wandb and psutil for monitoring and logging
-import wandb
-import psutil
-
 from .trainer import grad_checkpoint, TrainingArgs, TrainingCallback, average_gradients, iterate_batches
 
 
@@ -29,6 +25,9 @@ class GRPOTrainingArgs(TrainingArgs):
     epsilon: float = field(
         default=1e-4, metadata={"help": "The Epsilon for numerical stability."}
     )
+    max_completion_length: int = field(
+        default=512, metadata={"help": "Number of Generations."}
+    )
     reference_model_path: str = field(
         default=None,
         metadata={
@@ -37,67 +36,39 @@ class GRPOTrainingArgs(TrainingArgs):
     )
 
 
-def generate_for_grpo(
-        model,
-        prompt,
-        max_tokens,
-        tokenizer,
-        temperature=1.0
-):
-    try:
-        # Ensure prompt is the right shape
-        if len(prompt.shape) == 1:
-            prompt = prompt[None, :]
+def generate_grpo(model, prompt, max_tokens, tokenizer, temperature=1.0):
+    if len(prompt.shape) == 1:
+        prompt = prompt[None, :]
 
-        # Initialize generation
-        generated = []
-        current_prompt = prompt[0]
+    generated = []
+    current_prompt = prompt[0]
 
-        for step in range(max_tokens):
-            try:
-                # Get model output with explicit shape checking
-                current_batch = current_prompt[None, :]
+    for _ in range(max_tokens):
+        current_batch = current_prompt[None, :]
+        logits = model(current_batch)
+        token_logits = logits[0, -1]
 
-                logits = model(current_batch)
+        if temperature > 0:
+            token_logits = token_logits / temperature
 
-                # Ensure we have the last token logits
-                token_logits = logits[0, -1]
+        probs = mx.softmax(token_logits)
+        next_token = mx.random.categorical(probs[None, :])
+        next_token = next_token[0]
+        mx.eval(next_token)
 
-                # Apply temperature and get probabilities
-                if temperature > 0:
-                    token_logits = token_logits / temperature
-                probs = mx.softmax(token_logits)
+        token_value = next_token.item()
+        generated.append(next_token)
 
-                # Sample the next token
-                next_token = mx.random.categorical(probs[None, :])
-                next_token = next_token[0]
+        current_prompt = mx.concatenate([current_prompt, next_token[None]])
+        if token_value == tokenizer.eos_token_id:
+            break
 
-                # Force evaluation to catch any issues
-                mx.eval(next_token)
-                token_value = next_token.item()
+    if not generated:
+        return prompt[0]
 
-                # Add to generated sequence
-                generated.append(next_token)
-                current_prompt = mx.concatenate([current_prompt, next_token[None]])
-
-                if token_value == tokenizer.eos_token_id:
-                    break
-
-            except Exception as e:
-                raise
-
-        if not generated:
-            return prompt[0]
-
-        try:
-            result = mx.concatenate([prompt[0], mx.stack(generated)])
-            mx.eval(result)
-            return result
-        except Exception as e:
-            raise
-
-    except Exception as e:
-        raise
+    result = mx.concatenate([prompt[0], mx.stack(generated)])
+    mx.eval(result)
+    return result
 
 
 def r1_extract_xml_answer(text: str) -> str:
@@ -188,6 +159,37 @@ def r1_count_xml(prompts: list, completions: list, answer: list, **kwargs) -> li
     return scores
 
 
+def get_per_token_logps(model, inputs, lengths):
+    # Get logits from model
+    logits = model(inputs).astype(mx.float32)  # [batch_size, seq_len, vocab_size]
+    # Remove last position as it corresponds to the next token prediction
+    logits = logits[:, :-1, :]  # [batch_size, seq_len-1, vocab_size]
+    targets = inputs[:, 1:]  # Shift inputs to get targets
+
+    # Process sequences individually to save memory
+    per_token_logps = []
+    for i in range(logits.shape[0]):
+        # Get sequence length for this example
+        seq_len = int(lengths[i]) - 1  # -1 because we removed last position
+
+        # Get logits and targets for this sequence
+        seq_logits = logits[i, :seq_len]  # [seq_len, vocab_size]
+        seq_targets = targets[i, :seq_len]  # [seq_len]
+
+        # Compute log probabilities
+        log_probs = nn.log_softmax(seq_logits, axis=-1)  # [seq_len, vocab_size]
+
+        # Gather log probs for actual tokens
+        token_log_probs = mx.take_along_axis(
+            log_probs,
+            seq_targets.reshape(seq_len, 1),
+            axis=-1
+        ).squeeze(-1)  # [seq_len]
+
+        per_token_logps.append(token_log_probs)
+    return per_token_logps
+
+
 def grpo_loss(
         model,
         tokenizer,
@@ -197,66 +199,39 @@ def grpo_loss(
         group_size=4,
         epsilon=1e-4,
         ref_model=None,
-        max_tokens=128,
+        max_tokens=64,
         temperature=1.0
 ):
-    """Modified GRPO loss function with better error handling"""
     prompt_tokens, answer_tokens, prompt_text, answer_text = batch
     batch_size = len(prompt_tokens)
 
-    # Generate completions for each prompt
+    # Generation logic remains the same
     all_completions = []
     all_completion_texts = []
 
     for prompt in prompt_tokens:
         prompt_tensor = mx.array(prompt)
-        prompt_completions = []
-        prompt_completion_texts = []
 
-        # Generate group_size completions for each prompt
         for _ in range(group_size):
             try:
-                completion_ids = generate_for_grpo(
-                    model,
-                    prompt_tensor,
-                    max_tokens,
-                    tokenizer=tokenizer,
-                    temperature=temperature
-                )
-
-                # Verify completion_ids is not None
+                completion_ids = generate_grpo(model, prompt_tensor, max_tokens, tokenizer, temperature)
                 if completion_ids is None:
-                    print("Warning: generate_for_grpo returned None")
-                    break
+                    continue
 
                 completion_text = tokenizer.decode(completion_ids.tolist())
-
-                prompt_completions.append(completion_ids)
-                prompt_completion_texts.append(completion_text)
+                all_completions.append(completion_ids)
+                all_completion_texts.append(completion_text)
 
             except Exception as e:
-                print(f"Error in completion generation: {str(e)}")
-                # Fallback to using original prompt
-                prompt_completions.append(prompt_tensor)
-                prompt_completion_texts.append(tokenizer.decode(prompt_tensor.tolist()))
+                print(f"Generation error: {e}")
+                continue
 
-        all_completions.extend(prompt_completions)
-        all_completion_texts.extend(prompt_completion_texts)
-
-    # Verify we have the expected number of completions
-    assert len(all_completions) == batch_size * group_size
-    assert len(all_completion_texts) == batch_size * group_size
-
-    # Expand answer_text and prompt_text to match completion groups
+    # Prepare inputs
     expanded_answers = []
     expanded_prompts = []
     for i in range(batch_size):
         expanded_answers.extend([answer_text[i]] * group_size)
         expanded_prompts.extend([prompt_text[i]] * group_size)
-
-    # Verify we have the expected number of completions
-    assert len(all_completions) == batch_size * group_size
-    assert len(all_completion_texts) == batch_size * group_size
 
     max_length = max(ids.shape[0] for ids in all_completions)
     padded_completions = []
@@ -278,93 +253,87 @@ def grpo_loss(
     attention_mask = mx.stack(attention_masks)
     lengths = attention_mask.sum(axis=1)
 
-    # Get logits from current model
-    logits = model(inputs).astype(mx.float32)
+    # Current policy probabilities
+    token_log_probs = get_per_token_logps(model, inputs, lengths)
 
-    # Calculate log probabilities
-    log_probs = nn.log_softmax(logits[:, :-1, :], axis=-1)
-
-    # Prepare targets
-    targets = inputs[:, 1:]
-
-    # Gather actual token probabilities
-    token_log_probs = mx.take_along_axis(
-        log_probs,
-        targets.reshape(*targets.shape, 1),
-        axis=-1
-    ).squeeze(-1)
-
-    # Get reference model log probabilities
+    # Reference policy probabilities
     if ref_model is not None:
-        ref_logits = ref_model(inputs).astype(mx.float32)
+        ref_token_log_probs = get_per_token_logps(ref_model, inputs, lengths)
     else:
-        ref_logits = model(inputs).astype(mx.float32)
+        ref_token_log_probs = token_log_probs
 
-    ref_log_probs = nn.log_softmax(ref_logits[:, :-1, :], axis=-1)
-    ref_token_log_probs = mx.take_along_axis(
-        ref_log_probs,
-        targets.reshape(*targets.shape, 1),
-        axis=-1
-    ).squeeze(-1)
+    max_len = max(x.shape[0] for x in token_log_probs)
+    padded_log_probs = []
+    padded_ref_log_probs = []
 
-    # Compute KL divergence
-    kl_div = (mx.exp(ref_token_log_probs - token_log_probs) - (ref_token_log_probs - token_log_probs) - 1)
+    for i in range(len(token_log_probs)):
+        seq_len = token_log_probs[i].shape[0]
+        padding = mx.zeros((max_len - seq_len,), dtype=mx.float32)
 
-    # Calculate combined rewards from all reward functions
+        padded_log_probs.append(mx.concatenate([token_log_probs[i], padding]))
+        padded_ref_log_probs.append(mx.concatenate([ref_token_log_probs[i], padding]))
+
+    token_log_probs = mx.stack(padded_log_probs)
+    ref_token_log_probs = mx.stack(padded_ref_log_probs)
+
+    # Calculate rewards and advantages
     rewards = mx.zeros((len(all_completions),))
     for reward_func in reward_funcs:
         func_rewards = mx.array(reward_func(
-            prompts=prompt_text,
+            prompts=expanded_prompts,
             completions=all_completion_texts,
-            answer=answer_text
+            answer=expanded_answers
         ))
         rewards += func_rewards
 
-    # Normalize rewards if using multiple reward functions
     if len(reward_funcs) > 1:
         rewards /= len(reward_funcs)
 
-    # Compute grouped-wise rewards
-    grouped_rewards = rewards.reshape(batch_size, group_size)
-    mean_grouped_rewards = mx.mean(grouped_rewards, axis=1)
-    std_grouped_rewards = mx.std(grouped_rewards, axis=1)
+    # Reshape rewards and compute advantages following GRPO formula
+    rewards_reshaped = rewards.reshape(batch_size, group_size)
+    mean_rewards = mx.broadcast_to(mx.mean(rewards_reshaped, axis=1)[:, None],
+                                   (rewards_reshaped.shape[0], group_size)).reshape(-1)
+    std_rewards = mx.broadcast_to(mx.std(rewards_reshaped, axis=1)[:, None],
+                                  (rewards_reshaped.shape[0], group_size)).reshape(-1)
+    advantages = (rewards - mean_rewards) / (std_rewards + epsilon)
 
-    # Normalize rewards to compute advantages
-    mean_grouped_rewards = mx.repeat(mean_grouped_rewards.reshape(-1, 1), group_size, axis=1).reshape(-1)
-    std_grouped_rewards = mx.repeat(std_grouped_rewards.reshape(-1, 1), group_size, axis=1).reshape(-1)
-    advantages = (rewards - mean_grouped_rewards) / (std_grouped_rewards + epsilon)
+    # Compute KL divergence using Schulman's approximator
+    kl_div = mx.exp(ref_token_log_probs - token_log_probs) - (ref_token_log_probs - token_log_probs) - 1
 
-    # Create length mask for the shifted sequence
+    # Create mask for valid tokens
     length_mask = mx.arange(inputs.shape[1] - 1)[None, :] < (lengths[:, None] - 1)
 
-    # Calculate policy gradient loss
-    per_token_loss = mx.exp(token_log_probs - mx.stop_gradient(token_log_probs)) * advantages.reshape(-1, 1)
-    per_token_loss = -(per_token_loss - beta * kl_div)
+    # Compute policy ratio
+    policy_ratio = mx.exp(token_log_probs - mx.stop_gradient(token_log_probs))
 
-    # Normalize loss properly per sequence
+    # Compute per-token loss following GRPO formula
+    per_token_loss = -(policy_ratio * advantages.reshape(-1, 1) - beta * kl_div)
+
+    # Average over tokens and sequences
     sequence_sums = (per_token_loss * length_mask).sum(axis=1)
     sequence_lengths = length_mask.sum(axis=1)
     loss = (sequence_sums / sequence_lengths).mean()
 
-    # Calculate mean KL divergence
+    # Calculate mean KL divergence for metrics
     mean_kl = ((kl_div * length_mask).sum(axis=1) / length_mask.sum(axis=1)).mean()
 
-    # Collect metrics for each reward function separately
+    # Collect reward metrics
     reward_metrics = {}
     for i, reward_func in enumerate(reward_funcs):
+        func_name = reward_func.__name__
         func_rewards = mx.array(reward_func(
-            prompts=prompt_text,
+            prompts=expanded_prompts,
             completions=all_completion_texts,
-            answer=answer_text
+            answer=expanded_answers
         ))
-        reward_metrics[f'reward_func_{i}_mean'] = mx.mean(func_rewards)
-        reward_metrics[f'reward_func_{i}_std'] = mx.std(func_rewards)
+        reward_metrics[f'{func_name}_mean'] = mx.mean(func_rewards)
+        reward_metrics[f'{func_name}_std'] = mx.std(func_rewards)
 
     metrics = {
         'total_rewards_mean': mx.mean(rewards),
         'total_rewards_std': mx.std(rewards),
-        'grouped_rewards_mean': mx.mean(grouped_rewards),
-        'grouped_rewards_std': mx.std(grouped_rewards),
+        'grouped_rewards_mean': mx.mean(rewards_reshaped),
+        'grouped_rewards_std': mx.std(rewards_reshaped),
         'kl': mean_kl,
         **reward_metrics
     }
@@ -373,30 +342,15 @@ def grpo_loss(
 
 
 def iterate_grpo_batches(dataset, tokenizer, batch_size, max_seq_length, train=False):
-    """
-    Creates batches from dataset entries for GRPO training.
-
-    Args:
-        dataset: List of (prompt_tokens, answer_tokens, prompt_str, answer_str) tuples
-        tokenizer: Tokenizer for processing inputs
-        batch_size: Size of each batch
-        max_seq_length: Maximum sequence length
-        train: Whether this is for training
-
-    Yields:
-        Tuple containing:
-            - prompts_tokens: List of token sequences for current batch
-            - answers_tokens: List of token sequences
-            - prompts_text: List of prompt strings
-            - answers_text: List of answer strings
-    """
-    # Verify dataset format
+    """Memory-optimized version of iterate_grpo_batches"""
     if not dataset or not isinstance(dataset[0], tuple) or len(dataset[0]) != 4:
         raise ValueError("Dataset must be list of (prompt_tokens, answer_tokens, prompt_str, answer_str) tuples")
 
-    # Sort by combined length of prompt + answer tokens
-    idx = sorted(range(len(dataset)),
-                 key=lambda i: len(dataset[i][0]) + len(dataset[i][1]))
+    # Sort by length but use generator to avoid keeping full sorted list in memory
+    def length_key(i):
+        return len(dataset[i][0]) + len(dataset[i][1])
+
+    idx = sorted(range(len(dataset)), key=length_key)
 
     if len(dataset) < batch_size:
         raise ValueError(
@@ -404,26 +358,24 @@ def iterate_grpo_batches(dataset, tokenizer, batch_size, max_seq_length, train=F
             f"examples but only has {len(dataset)}."
         )
 
-    # Handle distributed training
     step = mx.distributed.init().size()
     if batch_size % step != 0:
         raise ValueError("The batch size must be divisible by the number of workers")
 
-    # Create batch indices
-    batch_idx = [
-        idx[i: i + batch_size: step]
-        for i in range(0, len(idx) - batch_size + 1, batch_size)
-    ]
+    # Use generator for batch indices
+    def batch_index_generator():
+        for i in range(0, len(idx) - batch_size + 1, batch_size):
+            yield idx[i: i + batch_size: step]
 
     while True:
-        # Shuffle batch indices if training
-        indices = np.random.permutation(len(batch_idx)) if train else range(len(batch_idx))
+        indices = (
+            np.random.permutation(list(batch_index_generator())) if train
+            else batch_index_generator()
+        )
 
-        for i in indices:
-            # Get current batch
-            current_batch = [dataset[j] for j in batch_idx[i]]
+        for batch_idx in indices:
+            current_batch = [dataset[j] for j in batch_idx]
 
-            # Extract all components
             prompts_tokens = [item[0] for item in current_batch]
             answers_tokens = [item[1] for item in current_batch]
             prompts_text = [item[2] for item in current_batch]
@@ -453,7 +405,7 @@ def evaluate_grpo(
         group_size: int,
         max_seq_length,
         reward_funcs=None,
-        loss: callable = grpo_loss,
+        loss_fn: callable = grpo_loss,
         iterate_batches: callable = iterate_grpo_batches
 ):
     """
@@ -479,7 +431,7 @@ def evaluate_grpo(
             ),
     ):
         # Calculate loss for current batch
-        losses, toks, metrics = loss(
+        losses, toks, metrics = loss_fn(
             model=model,
             tokenizer=tokenizer,
             batch=batch,
@@ -531,7 +483,7 @@ def train_grpo(
             r1_count_xml
         ],
         args: GRPOTrainingArgs = GRPOTrainingArgs(),
-        loss: callable = grpo_loss,
+        loss_fn: callable = grpo_loss,
         iterate_batches: callable = iterate_grpo_batches,
         training_callback: TrainingCallback = None,
 ):
@@ -547,19 +499,10 @@ def train_grpo(
 
     state = [model.state, optimizer.state]
 
-    # Initialize wandb at the beginning of training.
-    if rank == 0:
-        wandb.init(project="transformer-training", config={
-            "batch_size": args.batch_size,
-            "learning_rate": optimizer.learning_rate.item(),
-            # Add additional config parameters if needed.
-        })
-
-    loss_value_and_grad = nn.value_and_grad(model, loss)
-
     def step(batch):
+
         # Forward and backward pass
-        (loss_val, toks, metrics), grad = loss_value_and_grad(
+        (loss, toks, metrics), grad = loss_value_and_grad(
             model,
             tokenizer=tokenizer,
             batch=batch,
@@ -567,7 +510,8 @@ def train_grpo(
             beta=args.beta,
             group_size=args.group_size,
             epsilon=args.epsilon,
-            ref_model=ref_model
+            ref_model=ref_model,
+            max_tokens=args.max_completion_length,
         )
 
         # All reduce the gradients if running in distributed mode
@@ -576,22 +520,25 @@ def train_grpo(
         # Model update
         optimizer.update(model, grad)
 
-        return loss_val, toks, metrics
+        return loss, toks, metrics
+
+    loss_value_and_grad = nn.value_and_grad(model, loss_fn)
 
     losses = 0
     n_tokens = 0
     steps = 0
     trained_tokens = 0
     accumulated_metrics = {
-        'rewards': 0,
-        'rewards_std': 0,
-        'grouped_rewards': 0,
+        'total_rewards_mean': 0,
+        'total_rewards_std': 0,
+        'grouped_rewards_mean': 0,
         'grouped_rewards_std': 0,
         'kl': 0
     }
-    for i in range(len(reward_funcs)):
-        accumulated_metrics[f'reward_func_{i}_mean'] = 0
-        accumulated_metrics[f'reward_func_{i}_std'] = 0
+    for reward_func in reward_funcs:
+        func_name = reward_func.__name__
+        accumulated_metrics[f'{func_name}_mean'] = 0
+        accumulated_metrics[f'{func_name}_std'] = 0
 
     start = time.perf_counter()
     for it, batch in zip(
@@ -611,7 +558,7 @@ def train_grpo(
             val_loss, val_ntokens, val_metrics = evaluate_grpo(
                 model=model,
                 dataset=val_dataset,
-                loss=loss,
+                loss_fn=loss_fn,
                 ref_model=ref_model,
                 reward_funcs=reward_funcs,
                 tokenizer=tokenizer,
@@ -634,10 +581,11 @@ def train_grpo(
                     f"Val kl {val_metrics['kl']:.3f}"
                 )
 
-                for i in range(len(reward_funcs)):
+                # Add reward function specific metrics
+                for i, reward_func in enumerate(reward_funcs):
                     val_metrics_str += (
-                        f", Val reward_func_{i}_mean {val_metrics[f'reward_func_{i}_mean']:.3f}, "
-                        f"Val reward_func_{i}_std {val_metrics[f'reward_func_{i}_std']:.3f}"
+                        f", Val {reward_func.__name__}_mean {val_metrics[f'{reward_func.__name__}_mean']:.3f}, "
+                        f"Val {reward_func.__name__}_std {val_metrics[f'{reward_func.__name__}_std']:.3f}"
                     )
 
                 print(
@@ -656,12 +604,14 @@ def train_grpo(
 
             start = time.perf_counter()
 
-        loss_val, toks, metrics = step(batch)
-        losses += loss_val
+        loss, toks, metrics = step(batch)
+        losses += loss
         n_tokens += toks
         steps += 1
+
         for k, v in metrics.items():
             accumulated_metrics[k] += v
+
         mx.eval(state, losses, n_tokens)
 
         if it % args.steps_per_report == 0 or it == args.iters:
@@ -686,10 +636,13 @@ def train_grpo(
                     f"Grouped rewards std {avg_metrics['grouped_rewards_std']:.3f}, "
                     f"KL {avg_metrics['kl']:.3f}"
                 )
-                for i in range(len(reward_funcs)):
+
+                # Add reward function specific metrics
+                for i, reward_func in enumerate(reward_funcs):
+                    func_name = reward_func.__name__
                     train_metrics_str += (
-                        f", Reward func {i} mean {avg_metrics[f'reward_func_{i}_mean']:.3f}, "
-                        f"Reward func {i} std {avg_metrics[f'reward_func_{i}_std']:.3f}"
+                        f", {func_name} mean {avg_metrics[f'{func_name}_mean']:.3f}, "
+                        f"{func_name} std {avg_metrics[f'{func_name}_std']:.3f}"
                     )
 
                 print(
@@ -700,25 +653,6 @@ def train_grpo(
                     f"Peak mem {peak_mem:.3f} GB",
                     flush=True,
                 )
-
-                # Collect system metrics using psutil
-                cpu_percent = psutil.cpu_percent(interval=None)
-                mem = psutil.virtual_memory()
-                memory_used = mem.used / (1024 ** 3)  # bytes to GB
-                memory_total = mem.total / (1024 ** 3)  # bytes to GB
-
-                # Log metrics to wandb
-                wandb.log({
-                    "iteration": it + 1,
-                    "train_loss": train_loss,
-                    "it_per_sec": it_sec,
-                    "tokens_per_sec": tokens_sec,
-                    "learning_rate": learning_rate,
-                    "cpu_usage_percent": cpu_percent,
-                    "memory_used_GB": memory_used,
-                    "memory_total_GB": memory_total,
-                    "peak_memory_GB": peak_mem,
-                })
 
             if training_callback is not None:
                 training_callback.on_train_loss_report({
@@ -742,7 +676,7 @@ def train_grpo(
             adapter_weights = dict(tree_flatten(model.trainable_parameters()))
             mx.save_safetensors(str(args.adapter_file), adapter_weights)
             checkpoint = (
-                Path(args.adapter_file).parent / f"{it:07d}_adapters.safetensors"
+                    Path(args.adapter_file).parent / f"{it:07d}_adapters.safetensors"
             )
             mx.save_safetensors(str(checkpoint), adapter_weights)
             print(
@@ -754,4 +688,3 @@ def train_grpo(
     adapter_weights = dict(tree_flatten(model.trainable_parameters()))
     mx.save_safetensors(str(args.adapter_file), adapter_weights)
     print(f"Saved final weights to {args.adapter_file}.")
-

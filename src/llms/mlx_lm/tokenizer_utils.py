@@ -266,6 +266,10 @@ class TokenizerWrapper:
             else {tokenizer.eos_token_id}
         )
 
+    def __call__(self, *args, **kwargs):
+        # Delegate the call to the underlying tokenizer.
+        return self._tokenizer(*args, **kwargs)
+
     def add_eos_token(self, token: str):
         token_id = None
         try:
