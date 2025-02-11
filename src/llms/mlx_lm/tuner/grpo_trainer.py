@@ -36,41 +36,6 @@ class GRPOTrainingArgs(TrainingArgs):
     )
 
 
-def generate_grpo(model, prompt, max_tokens, tokenizer, temperature=1.0):
-    if len(prompt.shape) == 1:
-        prompt = prompt[None, :]
-
-    generated = []
-    current_prompt = prompt[0]
-
-    for _ in range(max_tokens):
-        current_batch = current_prompt[None, :]
-        logits = model(current_batch)
-        token_logits = logits[0, -1]
-
-        if temperature > 0:
-            token_logits = token_logits / temperature
-
-        probs = mx.softmax(token_logits)
-        next_token = mx.random.categorical(probs[None, :])
-        next_token = next_token[0]
-        mx.eval(next_token)
-
-        token_value = next_token.item()
-        generated.append(next_token)
-
-        current_prompt = mx.concatenate([current_prompt, next_token[None]])
-        if token_value == tokenizer.eos_token_id:
-            break
-
-    if not generated:
-        return prompt[0]
-
-    result = mx.concatenate([prompt[0], mx.stack(generated)])
-    mx.eval(result)
-    return result
-
-
 def r1_extract_xml_answer(text: str) -> str:
     """Extracts the answer from an XML formatted text string."""
     try:
@@ -78,72 +43,55 @@ def r1_extract_xml_answer(text: str) -> str:
         answer = answer.split("</answer>")[0]
         return answer.strip()
     except:
-        print("[extract_xml_answer] Failed to extract answer from: ", text)
+        print("r1_extract_xml_answer returned empty string")
         return ""
 
 
-def r1_accuracy_reward_func(prompts: list, completions: list, answer: list, **kwargs) -> list[float]:
-    """Calculates reward based on accuracy of extracted answers.
-    Args:
-        prompts: List of input prompts
-        completions: List of completion strings
-        answer: Expected answer or list of answers
-        **kwargs: Additional arguments
-    Returns:
-        list[float]: Reward values for each completion
-    """
-    extracted_responses = [r1_extract_xml_answer(r) for r in completions]
-    return [2.0 if r == a else 0.0 for r, a in zip(extracted_responses, answer)]
-
-
 def r1_int_reward_func(prompts: list, completions: list, answer: list, **kwargs) -> list[float]:
-    """Rewards numerical responses.
-    Args:
-        prompts: List of input prompts
-        completions: List of completion strings
-        answer: Expected answer or list of answers
-        **kwargs: Additional arguments
-    Returns:
-        list[float]: Reward values for each completion
-    """
+    """Ensures we always return a list of floats."""
+    if not completions:
+        return [0.0] * len(prompts)
     extracted_responses = [r1_extract_xml_answer(r) for r in completions]
-    return [0.5 if r.isdigit() else 0.0 for r in extracted_responses]
+    return [0.5 if r and r.isdigit() else 0.0 for r in extracted_responses]
+
+
+def r1_accuracy_reward_func(prompts: list, completions: list, answer: list, **kwargs) -> list[float]:
+    """Ensures we always return a list of floats."""
+    if not completions or not answer:
+        return [0.0] * len(prompts)
+    extracted_responses = [r1_extract_xml_answer(r) for r in completions]
+    return [2.0 if r and a and r == a else 0.0 for r, a in zip(extracted_responses, answer)]
 
 
 def r1_soft_format_reward_func(prompts: list, completions: list, answer: list, **kwargs) -> list[float]:
-    """Rewards completions with flexible XML format."""
+    """Ensures we always return a list of floats."""
+    if not completions:
+        return [0.0] * len(prompts)
     pattern = r"<think>.*?</think>\s*<answer>.*?</answer>"
-    matches = [re.match(pattern, r) for r in completions]
+    matches = [bool(re.search(pattern, r)) if r else False for r in completions]
     return [0.5 if match else 0.0 for match in matches]
 
 
 def r1_strict_format_reward_func(prompts: list, completions: list, answer: list, **kwargs) -> list[float]:
-    """Rewards completions with strict XML format.
-    Args:
-        prompts: List of input prompts
-        completions: List of completion strings
-        answer: Expected answer or list of answers
-        **kwargs: Additional arguments
-    Returns:
-        list[float]: Reward values for each completion
-    """
+    """Ensures we always return a list of floats."""
+    if not completions:
+        return [0.0] * len(prompts)
     pattern = r"^<think>\n.*?\n</think>\n<answer>\n.*?\n</answer>\n$"
-    matches = [re.match(pattern, r) for r in completions]
+    matches = [bool(re.search(pattern, r)) if r else False for r in completions]
     return [0.5 if match else 0.0 for match in matches]
 
 
 def r1_count_xml(prompts: list, completions: list, answer: list, **kwargs) -> list[float]:
-    """Calculates score based on XML formatting.
-    Args:
-        prompts: List of input prompts (unused)
-        completions: List of completion strings to evaluate
-        answer: Expected answer or list of answers (unused)
-        **kwargs: Additional arguments
-    Returns:
-        list[float]: List of scores based on XML tag presence and formatting
-    """
+    """Ensures we always return a list of floats."""
+    if not completions:
+        return [0.0] * len(prompts)
+
     scores = []
     for text in completions:
+        if not text:
+            scores.append(0.0)
+            continue
+
         count = 0.0
         if text.count("<think>\n") == 1:
             count += 0.125
@@ -151,54 +99,93 @@ def r1_count_xml(prompts: list, completions: list, answer: list, **kwargs) -> li
             count += 0.125
         if text.count("\n<answer>\n") == 1:
             count += 0.125
-        count -= len(text.split("\n</answer>\n")[-1]) * 0.001
-        if text.count("\n</answer>") == 1:
+        if text.count("\n</answer>\n") == 1:
             count += 0.125
-        count -= (len(text.split("\n</answer>")[-1]) - 1) * 0.001
-        scores.append(count)
+
+        # Penalize extra text after </answer>
+        end_text = text.split("\n</answer>\n")[-1]
+        count -= len(end_text) * 0.001 if len(end_text) > 0 else 0
+
+        scores.append(max(0.0, count))  # Ensure non-negative score
+
     return scores
 
 
-def get_per_token_logps(model, inputs, lengths):
-    # Get logits from model
-    logits = model(inputs).astype(mx.float32)  # [batch_size, seq_len, vocab_size]
-    # Remove last position as it corresponds to the next token prediction
-    logits = logits[:, :-1, :]  # [batch_size, seq_len-1, vocab_size]
-    targets = inputs[:, 1:]  # Shift inputs to get targets
+def generate_grpo(model, prompt, max_tokens, tokenizer, temperature):
+    if len(prompt.shape) == 1:
+        prompt = prompt[None, :]
+    if prompt.shape[1] == 0:
+        return None
 
-    # Process sequences individually to save memory
+    end_sequence = tokenizer.encode("</answer>")
+    end_sequence_length = len(end_sequence)
+    output = mx.zeros((prompt.shape[1] + max_tokens,), dtype=mx.int32)
+    output[:prompt.shape[1]] = prompt[0]
+    current_length = prompt.shape[1]
+
+    try:
+        def sample(logits):
+            if temperature > 0:
+                logits /= temperature
+            logprobs = logits - mx.logsumexp(logits, keepdims=True)
+            return mx.random.categorical(logprobs[None, :]).astype(mx.int32)[0]
+
+        for _ in range(max_tokens):
+            current_input = output[:current_length][None, :]
+            logits = model(current_input)
+            token_logits = logits[0, -1]
+            next_token = sample(token_logits)
+            token_value = next_token.item()
+            output[current_length] = token_value
+            current_length += 1
+
+            if token_value == tokenizer.eos_token_id:
+                break
+
+            if current_length >= end_sequence_length:
+                last_tokens = output[current_length - end_sequence_length:current_length].tolist()
+                if last_tokens == end_sequence:
+                    break
+
+        if current_length > prompt.shape[1]:
+            return output[:current_length]
+
+    except Exception as e:
+        print(f"Generation error: {str(e)}")
+        return None
+
+    return None
+
+
+def get_per_token_logps(model, inputs, lengths):
+    logits = model(inputs).astype(mx.float16)
+    logits = logits[:, :-1, :]
+    targets = inputs[:, 1:]
     per_token_logps = []
     for i in range(logits.shape[0]):
-        # Get sequence length for this example
-        seq_len = int(lengths[i]) - 1  # -1 because we removed last position
-
-        # Get logits and targets for this sequence
-        seq_logits = logits[i, :seq_len]  # [seq_len, vocab_size]
-        seq_targets = targets[i, :seq_len]  # [seq_len]
-
-        # Compute log probabilities
-        log_probs = nn.log_softmax(seq_logits, axis=-1)  # [seq_len, vocab_size]
-
-        # Gather log probs for actual tokens
+        seq_len = int(lengths[i]) - 1
+        seq_logits = logits[i, :seq_len]
+        seq_targets = targets[i, :seq_len]
+        log_probs = nn.log_softmax(seq_logits, axis=-1)
         token_log_probs = mx.take_along_axis(
             log_probs,
             seq_targets.reshape(seq_len, 1),
             axis=-1
-        ).squeeze(-1)  # [seq_len]
-
+        ).squeeze(-1)
         per_token_logps.append(token_log_probs)
+        mx.eval(logits, stream=mx.gpu)
     return per_token_logps
 
 
 def grpo_loss(
         model,
+        ref_model,
         tokenizer,
         batch,
         reward_funcs=None,
         beta=0.1,
         group_size=4,
         epsilon=1e-4,
-        ref_model=None,
         max_tokens=64,
         temperature=1.0
 ):
@@ -209,22 +196,26 @@ def grpo_loss(
     all_completions = []
     all_completion_texts = []
 
-    for prompt in prompt_tokens:
-        prompt_tensor = mx.array(prompt)
+    for i in range(0, batch_size, batch_size):
+        batch_prompts = prompt_tokens[i:i + batch_size]
+        for prompt in batch_prompts:
+            prompt_tensor = mx.array(prompt)
+            for _ in range(group_size):
+                try:
+                    completion_ids = generate_grpo(model, prompt_tensor, max_tokens, tokenizer, temperature)
+                    if completion_ids is not None:
+                        completion_text = tokenizer.decode(completion_ids.tolist())
+                        all_completions.append(completion_ids)
+                        all_completion_texts.append(completion_text)
 
-        for _ in range(group_size):
-            try:
-                completion_ids = generate_grpo(model, prompt_tensor, max_tokens, tokenizer, temperature)
-                if completion_ids is None:
+                        # Clear completion tensors
+                        mx.eval(completion_ids)
+                        del completion_ids
+                except Exception as e:
+                    print(f"Generation error: {e}")
                     continue
 
-                completion_text = tokenizer.decode(completion_ids.tolist())
-                all_completions.append(completion_ids)
-                all_completion_texts.append(completion_text)
-
-            except Exception as e:
-                print(f"Generation error: {e}")
-                continue
+        mx.metal.clear_cache()
 
     # Prepare inputs
     expanded_answers = []
@@ -256,11 +247,14 @@ def grpo_loss(
     # Current policy probabilities
     token_log_probs = get_per_token_logps(model, inputs, lengths)
 
+    mx.eval(token_log_probs)
+    mx.metal.clear_cache()
+
     # Reference policy probabilities
-    if ref_model is not None:
-        ref_token_log_probs = get_per_token_logps(ref_model, inputs, lengths)
-    else:
+    if ref_model is None:
         ref_token_log_probs = token_log_probs
+    else:
+        ref_token_log_probs = get_per_token_logps(ref_model, inputs, lengths)
 
     max_len = max(x.shape[0] for x in token_log_probs)
     padded_log_probs = []
@@ -268,7 +262,7 @@ def grpo_loss(
 
     for i in range(len(token_log_probs)):
         seq_len = token_log_probs[i].shape[0]
-        padding = mx.zeros((max_len - seq_len,), dtype=mx.float32)
+        padding = mx.zeros((max_len - seq_len,))
 
         padded_log_probs.append(mx.concatenate([token_log_probs[i], padding]))
         padded_ref_log_probs.append(mx.concatenate([ref_token_log_probs[i], padding]))
@@ -298,19 +292,19 @@ def grpo_loss(
     advantages = (rewards - mean_rewards) / (std_rewards + epsilon)
 
     # Compute KL divergence using Schulman's approximator
-    kl_div = mx.exp(ref_token_log_probs - token_log_probs) - (ref_token_log_probs - token_log_probs) - 1
+    kl_div = mx.exp(token_log_probs - ref_token_log_probs) - (token_log_probs - ref_token_log_probs) - 1
 
     # Create mask for valid tokens
     length_mask = mx.arange(inputs.shape[1] - 1)[None, :] < (lengths[:, None] - 1)
 
     # Compute policy ratio
-    policy_ratio = mx.exp(token_log_probs - mx.stop_gradient(token_log_probs))
+    policy_ratio = mx.exp(mx.array(token_log_probs - mx.stop_gradient(ref_token_log_probs)))
 
     # Compute per-token loss following GRPO formula
-    per_token_loss = -(policy_ratio * advantages.reshape(-1, 1) - beta * kl_div)
+    per_token_loss = -((policy_ratio * advantages.reshape(-1, 1) - beta * kl_div) * length_mask)
 
-    # Average over tokens and sequences
-    sequence_sums = (per_token_loss * length_mask).sum(axis=1)
+    # Average over tokens
+    sequence_sums = per_token_loss.sum(axis=1)
     sequence_lengths = length_mask.sum(axis=1)
     loss = (sequence_sums / sequence_lengths).mean()
 
@@ -337,12 +331,12 @@ def grpo_loss(
         'kl': mean_kl,
         **reward_metrics
     }
+    mx.metal.clear_cache()
 
     return loss, sequence_lengths.sum(), metrics
 
 
 def iterate_grpo_batches(dataset, tokenizer, batch_size, max_seq_length, train=False):
-    """Memory-optimized version of iterate_grpo_batches"""
     if not dataset or not isinstance(dataset[0], tuple) or len(dataset[0]) != 4:
         raise ValueError("Dataset must be list of (prompt_tokens, answer_tokens, prompt_str, answer_str) tuples")
 
@@ -457,8 +451,8 @@ def evaluate_grpo(
         mx.eval(all_losses, ntokens)
 
     # Aggregate across distributed workers
-    all_losses = mx.distributed.all_sum(all_losses, stream=mx.cpu)
-    ntokens = mx.distributed.all_sum(ntokens, stream=mx.cpu)
+    all_losses = mx.distributed.all_sum(all_losses, stream=mx.gpu)
+    ntokens = mx.distributed.all_sum(ntokens, stream=mx.gpu)
     all_metrics = {k: mx.distributed.all_sum(v) for k, v in all_metrics.items()}
 
     # Calculate averages
