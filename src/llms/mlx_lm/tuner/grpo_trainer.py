@@ -173,7 +173,7 @@ def get_per_token_logps(model, inputs, lengths):
             axis=-1
         ).squeeze(-1)
         per_token_logps.append(token_log_probs)
-        mx.eval(logits, stream=mx.gpu)
+        mx.eval(logits)
     return per_token_logps
 
 
